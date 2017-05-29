@@ -21,12 +21,11 @@ function deepProp(obj, path){
 };
 
 /**
- * Bind reduxStore to Vue instance
+ * Extend Vue prototype + global mixin
  *
  * @param {Vue} Vue
- * @param {object} store - redux store
  */
-function bindVue(Vue, store) {
+function applyMixin(Vue) {
 	Vue.mixin({
 		created() {
 			if (this._bindProps) {
@@ -34,11 +33,11 @@ function bindVue(Vue, store) {
 					this._bindProps.forEach(prop => {
 						const {storeProp, realProp} = prop
 						if (realProp && storeProp) {
-							dotProp.set(this, realProp, deepProp(store.getState(), storeProp))
+							dotProp.set(this, realProp, deepProp(this.$store.store.getState(), storeProp))
 						}
 					})
 				}
-				this._unsubscribe = store.subscribe(handleChange)
+				this._unsubscribe = this.$store.store.subscribe(handleChange)
 			}
 		},
 		beforeDestroy() {
@@ -53,14 +52,29 @@ function bindVue(Vue, store) {
 		this._bindProps = this._bindProps || []
 		prop = parseProp(prop)
 		this._bindProps.push(prop)
-		return deepProp(store.getState(), prop.storeProp)
+		return deepProp(this.$store.store.getState(), prop.storeProp)
+	}
+
+	Object.defineProperty(Vue.prototype, '$store', {
+    get: function $store() {
+				if (!this.$root.store) {
+					throw new Error('No $store provided to root component');
+				}
+        return this.$root.store;
+    }
+	});
+}
+
+const RevueInstaller = {
+	install(_Vue) {
+		applyMixin(_Vue);
 	}
 }
 
 export default class Revue {
 	constructor(Vue, reduxStore, reduxActions) {
+    Vue.use(RevueInstaller);
 		this.store = reduxStore
-		bindVue(Vue, this.store)
 		if (reduxActions) {
 			this.reduxActions = reduxActions
 		}
