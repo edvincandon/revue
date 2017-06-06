@@ -34,7 +34,7 @@ function applyMixin(Vue) {
 					this._bindProps.forEach(prop => {
 						const {storeProp, realProp} = prop
 						if (realProp && storeProp) {
-							dotProp.set(this, realProp, deepProp(this.$store.getState(), storeProp))
+							dotProp.set(this, realProp, deepProp(this.$store.state, storeProp))
 						}
 					})
 				}
@@ -50,11 +50,10 @@ function applyMixin(Vue) {
 	Vue.prototype.$select = function (prop) {
 		// realProp: property name/path in your instance
 		// storeProp: property name/path in Redux store
-		console.log(this.$root)
 		this._bindProps = this._bindProps || []
 		prop = parseProp(prop)
 		this._bindProps.push(prop)
-		return deepProp(this.$store.getState(), prop.storeProp)
+		return deepProp(this.$store.state, prop.storeProp)
 	}
 
 	Object.defineProperty(Vue.prototype, '$store', {
@@ -86,18 +85,24 @@ export default class Revue {
     Vue.use(RevueInstaller) // Apply global mixin and extend prototype
 
 		this.store = reduxStore
+		this.subscribe = this.subscribe.bind(this);
 		if (reduxActions) {
 			this.reduxActions = reduxActions
 		}
 
+		const revueInstance = this;
+
 		const Provider = Vue.extend({
 			render: h => h(options.component),
 		  data: function () {
-		    return Object.assign({}, { store: reduxStore }, options.data)
+		    return Object.assign({}, { store: revueInstance }, options.data)
 		  }
 		})
 
 		new Provider().$mount(options.el)
+	}
+	subscribe (cb) {
+		this.store.subscribe(cb)
 	}
 	get state() {
 		return this.store.getState()
