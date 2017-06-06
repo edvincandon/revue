@@ -1,3 +1,4 @@
+import Vue from 'vue'
 import dotProp from 'dot-prop'
 
 // to valid and match like `a as x.y.z`
@@ -17,8 +18,8 @@ function parseProp(prop) {
 }
 
 function deepProp(obj, path){
-	return path.split('.').reduce((o, p) => o[p], obj);
-};
+	return path.split('.').reduce((o, p) => o[p], obj)
+}
 
 /**
  * Extend Vue prototype + global mixin
@@ -33,11 +34,11 @@ function applyMixin(Vue) {
 					this._bindProps.forEach(prop => {
 						const {storeProp, realProp} = prop
 						if (realProp && storeProp) {
-							dotProp.set(this, realProp, deepProp(this.$store.store.getState(), storeProp))
+							dotProp.set(this, realProp, deepProp(this.$store.getState(), storeProp))
 						}
 					})
 				}
-				this._unsubscribe = this.$store.store.subscribe(handleChange)
+				this._unsubscribe = this.$store.subscribe(handleChange)
 			}
 		},
 		beforeDestroy() {
@@ -49,35 +50,54 @@ function applyMixin(Vue) {
 	Vue.prototype.$select = function (prop) {
 		// realProp: property name/path in your instance
 		// storeProp: property name/path in Redux store
+		console.log(this.$root)
 		this._bindProps = this._bindProps || []
 		prop = parseProp(prop)
 		this._bindProps.push(prop)
-		return deepProp(this.$store.store.getState(), prop.storeProp)
+		return deepProp(this.$store.getState(), prop.storeProp)
 	}
 
 	Object.defineProperty(Vue.prototype, '$store', {
     get: function $store() {
 				if (!this.$root.store) {
-					throw new Error('No $store provided to root component');
+					throw new Error('No store provided to root component')
 				}
-        return this.$root.store;
+        return this.$root.store
     }
-	});
+	})
 }
 
 const RevueInstaller = {
 	install(_Vue) {
-		applyMixin(_Vue);
+		applyMixin(_Vue)
 	}
 }
 
 export default class Revue {
-	constructor(Vue, reduxStore, reduxActions) {
-    Vue.use(RevueInstaller);
+	constructor(reduxStore, reduxActions, options) {
+		if (!options.component) {
+			throw new Error('You must provide an entry point component to Revue')
+		}
+
+		if (!options.el) {
+			throw new Error('You must provide a target el to Revue')
+		}
+
+    Vue.use(RevueInstaller) // Apply global mixin and extend prototype
+
 		this.store = reduxStore
 		if (reduxActions) {
 			this.reduxActions = reduxActions
 		}
+
+		const Provider = Vue.extend({
+			render: h => h(options.component),
+		  data: function () {
+		    return Object.assign({}, { store: reduxStore }, options.data)
+		  }
+		})
+
+		new Provider().$mount(options.el)
 	}
 	get state() {
 		return this.store.getState()
